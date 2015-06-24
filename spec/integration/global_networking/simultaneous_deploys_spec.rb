@@ -107,8 +107,12 @@ describe 'simultaneous deploys', type: :integration do
       end
 
       def wait
-        @thread.join
-        return @output_io.string
+        begin
+          @thread.join
+          return @output_io.string, true
+        rescue StandardError => e
+          return e.message, false
+        end
       end
     end
 
@@ -118,7 +122,7 @@ describe 'simultaneous deploys', type: :integration do
       thread = Thread.new do
         output_io.puts(run_errand(errand_manifest, errand_job_name))
       end
-      return RunningErrand.new(thread, output_io)
+      RunningErrand.new(thread, output_io)
     end
 
     it 'allocates IPs correctly for simultaneous errand run and deploy' do
@@ -138,6 +142,24 @@ describe 'simultaneous deploys', type: :integration do
       job_deployment_ips = director.vms('second').map(&:ips).flatten
       expect(job_deployment_ips.count).to eq(1)
       expect(['192.168.1.2', '192.168.1.3']).to include(job_deployment_ips.first)
+    end
+
+    it 'raise correct error message when we over allocate IPs for errand and deploy' do
+      cloud_config = cloud_config(available_ips: 3)
+      manifest_with_errand = errand_manifest(instances: 2)
+      second_deployment_manifest = deployment_manifest(name: 'second', instances: 2)
+
+      upload_cloud_config(cloud_config_hash: cloud_config)
+      deploy_simple_manifest(manifest_hash: manifest_with_errand)
+
+      deploy_task_id = start_deploy(second_deployment_manifest)
+      errand = start_errand_in_thread(manifest_with_errand, 'errand_job')
+
+      deploy_output, deploy_success = director.task(deploy_task_id)
+      errand_output, errand_success = errand.wait
+
+      expect([deploy_success, errand_success]).to match_array([true, false])
+      expect(deploy_output + errand_output).to include("asked for a dynamic IP but there were no more available")
     end
   end
 end
