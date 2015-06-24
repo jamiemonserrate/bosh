@@ -100,6 +100,34 @@ describe 'simultaneous deploys', type: :integration do
       manifest
     end
 
+<<<<<<< HEAD
+=======
+    class RunningErrand
+      def initialize(thread, output_io)
+        @thread = thread
+        @output_io = output_io
+      end
+
+      def wait
+        begin
+          @thread.join
+          return @output_io.string, true
+        rescue StandardError => e
+          return e.message, false
+        end
+      end
+    end
+
+    def start_errand_in_thread(errand_manifest, errand_job_name)
+      # errands don't have a '--no-track' equivalent so we have to use a thread :(
+      output_io = StringIO.new("")
+      thread = Thread.new do
+        output_io.puts(run_errand(errand_manifest, errand_job_name))
+      end
+      RunningErrand.new(thread, output_io)
+    end
+
+>>>>>>> e0d288e... Correctly raises errand failure and logs clean up failure
     it 'allocates IPs correctly for simultaneous errand run and deploy' do
       cloud_config = cloud_config(available_ips: 2)
       manifest_with_errand = errand_manifest(instances: 1)
@@ -126,8 +154,15 @@ describe 'simultaneous deploys', type: :integration do
       deploy_simple_manifest(manifest_hash: manifest_with_errand)
 
       deploy_task_id = start_deploy(second_deployment_manifest)
+<<<<<<< HEAD
       errand_output, errand_success = run_errand(manifest_with_errand, 'errand_job')
       deploy_output, deploy_success = director.task(deploy_task_id)
+=======
+      errand = start_errand_in_thread(manifest_with_errand, 'errand_job')
+
+      deploy_output, deploy_success = director.task(deploy_task_id)
+      errand_output, errand_success = errand.wait
+>>>>>>> e0d288e... Correctly raises errand failure and logs clean up failure
 
       expect([deploy_success, errand_success]).to match_array([true, false])
       expect(deploy_output + errand_output).to include("asked for a dynamic IP but there were no more available")
