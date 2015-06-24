@@ -111,6 +111,11 @@ module IntegrationExampleGroup
     return_exit_code ? [output, exit_code] : output
   end
 
+  def run_errand(errand_deployment_manifest, errand_job_name)
+    set_deployment(manifest_hash: errand_deployment_manifest)
+    bosh_runner.run("run errand #{errand_job_name}")
+  end
+
   def yaml_file(name, object)
     Tempfile.new(name).tap do |f|
       f.write(Psych.dump(object))
