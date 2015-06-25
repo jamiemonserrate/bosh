@@ -42,13 +42,8 @@ module Bosh::Director
           @base_job.task_checkpoint
 
           @logger.info('Binding instance VMs')
-          # this just associates vms and instance models in the db
-          bind_crazy_unbound_vm_models(@deployment_plan.jobs_starting_on_deploy)
 
           @event_log.begin_stage('Preparing configuration', 1)
-          @base_job.track_and_log('Binding configuration') do
-            bind_configuration
-          end
         end
 
         def update_jobs
@@ -61,26 +56,6 @@ module Bosh::Director
         end
 
         private
-
-        # somehow, we end up with instances that have an instance.vm.model
-        # and an instance.model, but have not associated the two models.
-        # a.k.a. instance.model.vm == nil && instance.vm.model != nil
-        # there is no good reason for this! we should fix how instances
-        # are prepared so that they cannot be in this state.
-        def bind_crazy_unbound_vm_models(jobs)
-          jobs.each do |job|
-            job.instances.each do |instance|
-              return if instance.state == 'detached'
-
-              error_msg = ""
-              error_msg += "\n vms model missing" if instance.vm.model.nil?
-              error_msg += "\n instance model's vm doesnt mach vms model" if instance.model.vm != instance.vm.model
-              error_msg += "\n vms instance not equal to instance" if instance.vm.bound_instance != instance
-
-              raise Exception "INSTANCE IS CRAY CRAY:#{instance.inspect}"+error_msg unless error_msg.empty?
-            end
-          end
-        end
 
         def delete_unneeded_vms
           unneeded_vms = @deployment_plan.unneeded_vms
@@ -116,14 +91,6 @@ module Bosh::Director
           instance_deleter = InstanceDeleter.new(@deployment_plan)
           instance_deleter.delete_instances(unneeded_instances, event_log_stage)
           @logger.info('Deleted no longer needed instances')
-        end
-
-        # Calculates configuration checksums for all jobs in this deployment plan
-        # @return [void]
-        def bind_configuration
-          @deployment_plan.jobs_starting_on_deploy.each do |job|
-            JobRenderer.new(job, @blobstore).render_job_instances
-          end
         end
       end
     end
