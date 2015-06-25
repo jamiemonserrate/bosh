@@ -42,7 +42,6 @@ module Bosh::Director
       end
 
       @instance.apply_vm_state
-      @job_renderer.render_job_instance(@instance)
 
       [@vm_model, @agent_client]
     end
